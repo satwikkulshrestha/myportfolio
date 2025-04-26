@@ -1,0 +1,128 @@
+trigger:
+  branches:
+    include:
+      - main 
+
+variables:
+  containerRegistry: "<your acr name>.azurecr.io"
+  resourceGroup: "<your resource group>"
+  aksCluster: "<your aks cluster>"
+  namespace_QA: "qa"
+  namespace_UAT: "uat"
+  namespace_Prod: "prod"
+  namespace_DR: "dr"
+  deploymentFile: "deployment.yaml"
+
+stages:
+  - stage: SAST_Scanning
+    displayName: "Static Application Security Testing"
+    jobs:
+      - job: SAST
+        steps:
+          - task: SonarQubePrepare@5
+            displayName: "Prepare SonarQube"
+            inputs:
+              SonarQube: "SonarQubeServiceConnection"
+              scannerMode: "CLI"
+              configMode: "manual"
+              cliProjectKey: "$(imageName)"
+              cliProjectName: "$(imageName)"
+              cliSources: "."
+
+          - script: |
+              sonar-scanner
+            displayName: "Run SonarQube Scan"
+
+          - task: SonarQubePublish@5
+            displayName: "Publish SonarQube Results"
+
+  - stage: Build_And_Push
+    displayName: "Build and Push Docker Image"
+    dependsOn: SAST_Scanning
+    jobs:
+      - job: BuildAndPush
+        steps:
+          - task: Docker@2
+            displayName: "Login to ACR"
+            inputs:
+              command: "login"
+              containerRegistry: "ACRServiceConnection"
+
+          - script: |
+              docker build -t $(containerRegistry)/$(imageName):$(tag) .
+              docker push $(containerRegistry)/$(imageName):$(tag)
+            displayName: "Build and Push Docker Image"
+
+  - stage: Deploy_QA
+    displayName: "Deploy to QA"
+    dependsOn: Build_And_Push
+    jobs:
+      - job: DeployQA
+        steps:
+          - script: |
+              az aks get-credentials --resource-group $(resourceGroup) --name $(aksCluster)
+              kubectl apply -f $(deploymentFile) --namespace=$(namespace_QA)
+            displayName: "Deploy to QA AKS Namespace"
+
+  - stage: DAST_Scanning
+    displayName: "Dynamic Application Security Testing"
+    dependsOn: Deploy_QA
+    jobs:
+      - job: DAST
+        steps:
+          - script: |echo "Starting OWASP ZAP Container --> Start"
+              sh "sudo docker run --user=0 --rm -t -v $WORKSPACE:/zap/wrk/:rw owasp/zap2docker-stable zap-baseline.py -t <path to your environment> -z '-silent' -J zaproxy_report.json -r zaproxy_report_${env.Environment.toLowerCase()}.html 2>/dev/null || true"
+            displayName: "Run OWASP ZAP DAST Scan"
+
+  - stage: Deploy_UAT
+    displayName: "Deploy to UAT"
+    dependsOn: DAST_Scanning
+    jobs:
+      - job: DeployUAT
+        steps:
+          - script: |
+              az aks get-credentials --resource-group $(resourceGroup) --name $(aksCluster)
+              kubectl apply -f $(deploymentFile) --namespace=$(namespace_UAT)
+            displayName: "Deploy to UAT AKS Namespace"
+
+  - stage: Docker_Security_Scan
+    displayName: "Docker Image Security Scan using Grype"
+    dependsOn: Deploy_UAT
+    jobs:
+      - job: ImageScan
+        steps:
+          -    script {
+               if (env.FRONTEND == 'true') {
+                  if (env.Environment == 'PROD') {
+                      configFileProvider([configFile(fileId: 'grype_scan', targetLocation: 'grype_scan.tmpl')]) 
+                      { 
+                        sh "grypereport.html"
+                       }
+                    }
+                else {
+                  configFileProvider([configFile(fileId: 'grype_scan', targetLocation: 'grype_scan.tmpl')]) 
+                  { 
+                  sh "grype path$BUILD_NUMBER -o template -t grype_scan.tmpl > grypereport.html"}} } } 
+            displayName: "Run Grype Security Scan"
+
+  - stage: Deploy_Prod
+    displayName: "Deploy to Production"
+    dependsOn: Docker_Security_Scan
+    jobs:
+      - job: DeployProd
+        steps:
+          - script: |
+              az aks get-credentials --resource-group $(resourceGroup) --name $(aksCluster)
+              kubectl apply -f $(deploymentFile) --namespace=$(namespace_Prod)
+            displayName: "Deploy to Production AKS Namespace"
+
+  - stage: Deploy_DR
+    displayName: "Deploy to Disaster Recovery (DR)"
+    dependsOn: Deploy_Prod
+    jobs:
+      - job: DeployDR
+        steps:
+          - script: |
+              az aks get-credentials --resource-group $(resourceGroup) --name $(aksCluster)
+              kubectl apply -f $(deploymentFile) --namespace=$(namespace_DR)
+            displayName: "Deploy to DR AKS Namespace"

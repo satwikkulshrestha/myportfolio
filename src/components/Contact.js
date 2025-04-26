@@ -1,5 +1,6 @@
 import React from 'react';
 import styled from 'styled-components';
+import ContactForm from './ContactForm';
 
 const Section = styled.section`
   padding: 5rem 0;
@@ -40,19 +41,16 @@ const SocialLink = styled.a`
   }
 `;
 
-const EmailButton = styled.a`
-  display: inline-block;
-  padding: 1rem 2rem;
-  background: ${props => props.theme.primary};
-  color: white;
-  border-radius: 4px;
-  text-decoration: none;
-  font-weight: 500;
-  transition: transform 0.3s ease;
-
-  &:hover {
-    transform: translateY(-3px);
-    color: white;
+const Divider = styled.div`
+  margin: 2rem 0;
+  text-align: center;
+  
+  &::before {
+    content: "or";
+    display: inline-block;
+    padding: 0 1rem;
+    color: ${props => props.theme.secondary};
+    font-style: italic;
   }
 `;
 
@@ -76,9 +74,8 @@ const Contact = () => {
             <i className="fab fa-twitter"></i>
           </SocialLink>
         </SocialLinks>
-        <EmailButton href="mailto:contact@satwikkulshrestha.com">
-          Send me an email
-        </EmailButton>
+        <Divider />
+        <ContactForm />
       </ContactContainer>
     </Section>
   );
