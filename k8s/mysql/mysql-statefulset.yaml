@@ -1,0 +1,51 @@
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: mysql
+spec:
+  serviceName: "mysql"
+  replicas: 1
+  selector:
+    matchLabels:
+      app: mysql
+  template:
+    metadata:
+      labels:
+        app: mysql
+    spec:
+      containers:
+        - name: mysql
+          image: mysql:8.0
+          env:
+            - name: MYSQL_ROOT_PASSWORD
+              value: "1234"
+            - name: MYSQL_DATABASE
+              value: "portfolio"
+          volumeMounts:
+            - name: mysql-storage
+              mountPath: /var/lib/mysql
+          lifecycle:
+            postStart:
+              exec:
+                command:
+                  - /bin/sh
+                  - -c
+                  - |
+                    sleep 10
+                    mysql -u root -p1234 -e "CREATE DATABASE IF NOT EXISTS portfolio;"
+                    mysql -u root -p1234 portfolio -e "CREATE TABLE IF NOT EXISTS contacts (
+                      id INT AUTO_INCREMENT PRIMARY KEY,
+                      firstName VARCHAR(255) NOT NULL,
+                      lastName VARCHAR(255),
+                      contactNo VARCHAR(20) NOT NULL,
+                      email VARCHAR(255) NOT NULL,
+                      message TEXT NOT NULL,
+                      city VARCHAR(255),
+                      country VARCHAR(255),
+                      dateOfBirth DATE,
+                      createdAt TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                    );"
+      volumes:
+        - name: mysql-storage
+          persistentVolumeClaim:
+            claimName: mysql-pvc  # your pre-created PVC name

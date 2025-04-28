@@ -221,21 +221,32 @@ const ContactForm = () => {
 
     setIsSubmitting(true);
     try {
-      const response = await fetch('http://localhost:5001/api/contact', {
+      // Format the date before sending
+      const formattedData = {
+        ...formData,
+        dateOfBirth: formData.dateOfBirth ? formData.dateOfBirth.toISOString().split('T')[0] : null
+      };
+
+      // Use environment variable or default to localhost for development
+      const API_URL = process.env.REACT_APP_API_URL || 'http://localhost:5001';
+      
+      const response = await fetch(`${API_URL}/api/contact`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify(formData),
+        body: JSON.stringify(formattedData),
       });
 
+      const data = await response.json();
+
       if (!response.ok) {
-        throw new Error('Failed to submit form');
+        throw new Error(data.message || 'Failed to submit form');
       }
 
       setStatus({
         type: 'success',
-        message: 'Thank you for your message! We will get back to you soon.'
+        message: data.message || 'Thank you for your message! We will get back to you soon.'
       });
       setFormData({
         firstName: '',
@@ -250,7 +261,7 @@ const ContactForm = () => {
     } catch (error) {
       setStatus({
         type: 'error',
-        message: 'An error occurred while submitting the form. Please try again.'
+        message: error.message || 'An error occurred while submitting the form. Please try again.'
       });
     } finally {
       setIsSubmitting(false);
