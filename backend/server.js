@@ -59,7 +59,8 @@ app.post('/api/contact', async (req, res) => {
 
     res.status(200).json({ 
       message: 'Form submitted successfully',
-      submission: newSubmission 
+      submission: newSubmission,
+      version: "1.0.0" 
     });
   } catch (error) {
     console.error('Error processing form submission:', error);
@@ -72,15 +73,6 @@ app.get('/api/submissions', (req, res) => {
   res.json(submissions);
 });
 
-// Add a GET endpoint to view a specific submission
-app.get('/api/submissions/:id', (req, res) => {
-  const submission = submissions.find(s => s.id === parseInt(req.params.id));
-  if (!submission) {
-    return res.status(404).json({ error: 'Submission not found' });
-  }
-  res.json(submission);
-});
-
 // Add this new endpoint to clear all submissions
 app.delete('/api/submissions/clear', (req, res) => {
   const count = submissions.length;  // Store count before clearing
@@ -89,6 +81,15 @@ app.delete('/api/submissions/clear', (req, res) => {
     message: `Successfully cleared ${count} submissions`,
     clearedCount: count
   });
+});
+
+// Add a GET endpoint to view a specific submission
+app.get('/api/submissions/:id', (req, res) => {
+  const submission = submissions.find(s => s.id === parseInt(req.params.id));
+  if (!submission) {
+    return res.status(404).json({ error: 'Submission not found' });
+  }
+  res.json(submission);
 });
 
 // Start server

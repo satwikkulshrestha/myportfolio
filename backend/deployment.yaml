@@ -1,49 +1,46 @@
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: contact-form-backend
+  name: backend-deployment
+  labels:
+    app: backend
 spec:
-  replicas: 2
+  replicas: 3  # Number of replicas (pods) you want to run
   selector:
     matchLabels:
-      app: contact-form-backend
+      app: backend
   template:
     metadata:
       labels:
-        app: contact-form-backend
+        app: backend
     spec:
       containers:
-      - name: contact-form-backend
-        image: contact-form-backend:latest
-        ports:
-        - containerPort: 5000
-        env:
-        - name: PORT
-          value: "5000"
-        - name: EMAIL_USER
-          valueFrom:
-            secretKeyRef:
-              name: contact-form-secrets
-              key: email-user
-        - name: EMAIL_PASS
-          valueFrom:
-            secretKeyRef:
-              name: contact-form-secrets
-              key: email-pass
-        - name: EMAIL_RECIPIENT
-          valueFrom:
-            secretKeyRef:
-              name: contact-form-secrets
-              key: email-recipient
+        - name: backend
+          image: satwikkulshrestha/backend:latest  # Docker Hub image name with tag
+          imagePullPolicy: Always
+          ports:
+            - containerPort: 5001  # Port where the backend is listening
+          env:
+            - name: NODE_ENV
+              value: "production"  # Environment variable to define the mode of your app
+          resources:
+            limits:
+              cpu: "500m"  # Limit for CPU
+              memory: "512Mi"  # Limit for memory
+            requests:
+              cpu: "250m"  # Requested CPU usage
+              memory: "256Mi"  # Requested memory usage
+
 ---
 apiVersion: v1
 kind: Service
 metadata:
-  name: contact-form-backend
+  name: backend-service
 spec:
   selector:
-    app: contact-form-backend
+    app: backend  # Match the pods with the label 'app: backend'
   ports:
-  - port: 80
-    targetPort: 5000
-  type: ClusterIP 
+    - protocol: TCP
+      port: 5001  # Port exposed for external access
+      targetPort: 5001  # Port the backend is listening on inside the container
+  type: NodePort  # Change to NodePort for local environment (or use NodePort in other clusters)

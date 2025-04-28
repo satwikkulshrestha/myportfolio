@@ -2,7 +2,7 @@ apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: portfolio-deployment
-  namespace: aksprod
+  namespace: default
   labels:
     app: portfolio
 spec:
@@ -18,9 +18,12 @@ spec:
       serviceAccountName: portfolio-sa
       containers:
       - name: portfolio
-        image: reactportfolio.azurecr.io/my-portfolio:latest
+        image: satwikkulshrestha/frontend:latest
         ports:
         - containerPort: 80
+        env:
+        - name: REACT_APP_API_URL
+          value: "http://portfolio-backend-service:5001"
         resources:
           requests:
             cpu: "100m"
@@ -28,6 +31,4 @@ spec:
           limits:
             cpu: "200m"
             memory: "256Mi"
-      imagePullSecrets:
-        - name: regcred
 ---
